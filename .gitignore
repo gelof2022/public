@@ -1,0 +1,16 @@
+.env
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+.test-venv/
+.ruff_cache/
+.coverage
+htmlcov/
+appdata/
+postgres-data/
+redis-data/
+*.tar
+*.tar.gz
+.idea/
+.vscode/

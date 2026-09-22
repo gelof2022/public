@@ -1,0 +1,10 @@
+# Apply after compose.yaml when installing the prebuilt 0.9.9 image bundle.
+services:
+  api:
+    image: video-face-recogniser-backend:0.9.9
+  worker:
+    image: video-face-recogniser-backend:0.9.9
+  migrate:
+    image: video-face-recogniser-backend:0.9.9
+  web:
+    image: video-face-recogniser-web:0.9.9

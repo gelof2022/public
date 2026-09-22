@@ -1,0 +1,15 @@
+.git
+.env
+__pycache__
+*.pyc
+.pytest_cache
+appdata
+postgres-data
+redis-data
+
+.venv
+.test-venv
+.ruff_cache
+.DS_Store
+*.tar
+*.tar.gz

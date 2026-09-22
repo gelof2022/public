@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark light" />
+    <title>Video Face Recogniser</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header>
+      <div class="brand"><p class="eyebrow">Private, local processing</p><h1>Video Face Recogniser</h1></div>
+      <nav aria-label="Main navigation">
+        <button type="button" class="tab-button active" data-tab="workflow">Workflow</button>
+        <button type="button" class="tab-button" data-tab="batches">Batches</button>
+        <button type="button" class="tab-button" data-tab="review">Review</button>
+        <button type="button" class="tab-button" data-tab="connection">Connection</button>
+        <button type="button" class="tab-button" data-tab="settings">Settings</button>
+      </nav>
+      <span id="health" class="status">Checking API…</span>
+    </header>
+
+    <main>
+      <section id="tab-workflow" class="tab-panel active">
+        <div class="page-heading">
+          <div><p class="eyebrow">Phase 2 · Video processing</p><h2>Create a processing batch</h2></div>
+          <div class="hero-stat"><strong id="scene-count">—</strong><span>matching scenes</span></div>
+        </div>
+        <article class="workflow-panel">
+          <form id="batch-form">
+            <div class="form-grid primary-fields">
+              <label>Batch name<input id="batch-name" required maxlength="255" placeholder="September family videos" /></label>
+              <label>Search title, directory, filename or Stash ID<input id="scene-search" type="search" placeholder="For example Canon/2019 or birthday" /></label>
+              <label>Processing status
+                <select id="scene-status"><option value="all">All scenes</option><option value="unprocessed">Not processed</option><option value="processed">Previously processed</option></select>
+              </label>
+              <label>Review batch<select id="scene-review-batch"><option value="">Latest active batch per scene</option></select></label>
+              <label class="workflow-review-filter"><input id="scene-awaiting-review" type="checkbox" />Awaiting Review only</label>
+              <label>Date from<input id="date-from" type="date" /></label>
+              <label>Date to<input id="date-to" type="date" /></label>
+            </div>
+
+            <div class="bulk-bar">
+              <button id="select-page" type="button" class="secondary">Select this page</button>
+              <button id="select-all" type="button" class="secondary">Select all matches</button>
+              <span class="quick-select"><input id="quick-count" type="number" value="20" min="1" max="1000" /><button id="select-next" type="button" class="secondary">Add next unprocessed</button></span>
+              <button id="clear-selection" type="button" class="quiet">Clear selection</button>
+            </div>
+
+            <p class="hint">Search for a directory path, then choose “Select all matches” to add a whole folder.</p>
+            <div id="scene-picker" class="scene-picker"><p class="empty">Loading scenes…</p></div>
+            <div class="picker-footer">
+              <button id="scene-prev" type="button" class="secondary">Previous</button>
+              <span id="scene-page" class="hint"></span>
+              <button id="scene-next" type="button" class="secondary">Next</button>
+            </div>
+            <div class="selection-bar">
+              <strong id="selected-count">0 scenes selected</strong>
+              <button type="submit">Create processing batch</button>
+            </div>
+          </form>
+          <div id="batch-result" class="message"></div>
+        </article>
+      </section>
+
+      <section id="tab-batches" class="tab-panel" hidden>
+        <div class="page-heading"><div><p class="eyebrow">Persistent state</p><h2>Batches</h2></div><button id="refresh" class="secondary">Refresh</button></div>
+        <div id="batches-result" class="message"></div>
+        <article><label><input type="checkbox" id="show-archived-batches" />Show archived batches</label><div id="batch-list" class="batch-list"><p class="empty">No batches yet.</p></div></article>
+        <article id="frames-section" class="frames-section" hidden>
+          <div class="section-heading"><div><p class="eyebrow">Generated evidence</p><h3>Extracted frames</h3></div></div>
+          <div id="frame-gallery" class="frame-gallery"></div>
+        </article>
+      </section>
+
+      <section id="tab-review" class="tab-panel" hidden>
+        <div class="page-heading"><div><p class="eyebrow">Manual identity review</p><h2>Review</h2></div></div>
+        <div class="review-toolbar">
+          <label>Batch<select id="review-batch"><option value="">Select a batch</option></select></label>
+          <button type="button" id="review-import">Import latest groups</button>
+          <button type="button" id="review-refresh" class="secondary">Refresh</button>
+        </div>
+        <nav class="review-navigation" aria-label="Review sections">
+          <button type="button" class="review-tab-button" data-review-tab="scenes" aria-pressed="true">Scenes</button>
+          <button type="button" class="review-tab-button" data-review-tab="people" aria-pressed="false">People</button>
+        </nav>
+        <p id="review-result" class="message" role="status"></p>
+        <div id="review-content"></div>
+      </section>
+
+      <section id="tab-connection" class="tab-panel" hidden>
+        <div class="page-heading"><div><p class="eyebrow">Integration</p><h2>Connection</h2></div></div>
+        <article class="connection-panel">
+          <div class="section-heading"><div><p class="eyebrow">Stash</p><h3>Catalogue connection</h3></div><button id="test-stash" class="secondary">Test connection</button></div>
+          <dl id="settings"><dt>URL</dt><dd>Loading…</dd></dl>
+          <div id="stash-result" class="message"></div>
+          <button id="sync-stash">Sync scene metadata and thumbnails</button>
+          <h3>Sync people to Stash</h3><p>Add manually tagged and face-confirmed people as scene performers. Missing performers are created automatically by name. Existing Stash performers and tags are preserved; removals here are not propagated.</p>
+          <button id="export-stash-people">Sync to Stash</button><div id="export-stash-result" class="message" role="status"></div>
+        </article>
+      </section>
+      <section id="tab-settings" class="tab-panel" hidden>
+        <h2>Application settings</h2>
+        <form id="preferences-form" class="workflow-panel">
+          <div class="form-grid">
+            <label>Default detection confidence<input name="detection_threshold" type="number" min="0.1" max="0.99" step="0.01" required /></label>
+            <label>Default recognition minimum similarity<input name="recognition_threshold" type="number" min="0" max="1" step="0.01" required /></label>
+            <label>Default regroup similarity<input name="grouping_threshold" type="number" min="0.1" max="0.5" step="0.01" required /></label>
+            <label>Appearance<select name="theme"><option value="dark">Dark</option><option value="light">Light</option></select></label>
+            <label class="preference-checkbox"><input name="stash_playback_fallback" type="checkbox" />Try Stash when original playback fails</label>
+          </div>
+          <p class="hint">Lower thresholds include weaker matches. Detection applies to newly analysed frames and new re-detection previews; cached faces and existing decisions are preserved. Recognition controls scene person suggestions and the initial detailed-review threshold. Regroup similarity is a starting value for manual regrouping. Settings are shared across the app.</p>
+          <button type="submit">Save settings</button><p id="preferences-result" role="status"></p>
+        </form>
+      </section>
+    </main>
+
+    <footer>Video Face Recogniser <span id="app-version">v—</span></footer>
+    <dialog id="video-dialog" aria-labelledby="video-heading">
+      <div class="section-heading"><h3 id="video-heading">Scene playback</h3><button id="close-video" type="button">Close</button></div>
+      <video id="scene-player" controls playsinline preload="metadata"></video>
+      <p id="video-error" role="status"></p>
+    </dialog>
+    <dialog id="face-frame-dialog" aria-labelledby="face-frame-heading">
+      <div class="section-heading"><h3 id="face-frame-heading">Face in extracted frame</h3><button id="close-face-frame" type="button">Close</button></div>
+      <div class="face-frame-stage"><img id="face-frame-image" alt="Original extracted frame" /><svg id="face-frame-overlay" aria-label="Selected face outlined in yellow"></svg></div>
+      <p id="face-frame-error" role="status"></p>
+    </dialog>
+    <script src="/app.js" defer></script>
+    <script src="/review.js" defer></script>
+  <script src="/scene-review.js" defer></script>
+    <script src="/redetection.js" defer></script>
+    <script src="/settings.js" defer></script>
+  </body>
+</html>

@@ -1,0 +1,115 @@
+name: video-face-recogniser
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-face_recogniser}
+      POSTGRES_USER: ${POSTGRES_USER:-face_recogniser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  migrate:
+    image: video-face-recogniser-backend:latest
+    command: alembic upgrade head
+    restart: "no"
+    environment: &backend-environment
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-face_recogniser}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-face_recogniser}
+      REDIS_URL: redis://redis:6379/0
+      STASH_URL: ${STASH_URL:-}
+      STASH_API_KEY: ${STASH_API_KEY:-}
+      STASH_PATH_PREFIX: ${STASH_PATH_PREFIX:-/data}
+      MEDIA_PATH_PREFIX: ${MEDIA_PATH_PREFIX:-/media}
+      APPDATA_PATH: /appdata
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8787}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      FRAME_SCAN_FPS: ${FRAME_SCAN_FPS:-2}
+      FRAME_SAMPLE_INTERVAL_SECONDS: ${FRAME_SAMPLE_INTERVAL_SECONDS:-30}
+      FRAME_SCENE_THRESHOLD: ${FRAME_SCENE_THRESHOLD:-0.35}
+      MAX_FRAMES_PER_VIDEO: ${MAX_FRAMES_PER_VIDEO:-300}
+      FRAME_MAX_WIDTH: ${FRAME_MAX_WIDTH:-1920}
+      APPEARANCE_ENABLED: ${APPEARANCE_ENABLED:-true}
+      APPEARANCE_CROP_SIDE: ${APPEARANCE_CROP_SIDE:-0.75}
+      APPEARANCE_CROP_ABOVE: ${APPEARANCE_CROP_ABOVE:-0.25}
+      APPEARANCE_CROP_BELOW: ${APPEARANCE_CROP_BELOW:-2.0}
+      GROUPING_ASSISTED_MIN: ${GROUPING_ASSISTED_MIN:-0.45}
+      GROUPING_APPEARANCE_MIN: ${GROUPING_APPEARANCE_MIN:-0.90}
+      GROUPING_ASSISTED_SECONDS: ${GROUPING_ASSISTED_SECONDS:-30}
+      GROUPING_DUPLICATE_MIN: ${GROUPING_DUPLICATE_MIN:-0.97}
+      GROUPING_DUPLICATE_SECONDS: ${GROUPING_DUPLICATE_SECONDS:-3}
+      PROCESSING_JOB_TIMEOUT_SECONDS: ${PROCESSING_JOB_TIMEOUT_SECONDS:-21600}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    image: video-face-recogniser-backend:latest
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    environment: *backend-environment
+    volumes:
+      - ${MEDIA_LIBRARY_PATH:-/data}:/media:ro
+      - ${APPDATA_PATH:-./appdata}:/appdata
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  worker:
+    image: video-face-recogniser-backend:latest
+    command: rq worker --url redis://redis:6379/0 default
+    restart: unless-stopped
+    environment: *backend-environment
+    volumes:
+      - ${MEDIA_LIBRARY_PATH:-/data}:/media:ro
+      - ${APPDATA_PATH:-./appdata}:/appdata
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ./web
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-8787}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  postgres-data:
+  redis-data:
